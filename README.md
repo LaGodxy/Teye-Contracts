@@ -1,4 +1,4 @@
-# 🌟 Stellar Teye - Decentralized Vision Care Records on Stellar
+# Stellar Teye - Decentralized Vision Care Records on Stellar
 
 [![Rust](https://img.shields.io/badge/Rust-1.78%2B-orange.svg)](https://www.rust-lang.org/)
 [![Soroban](https://img.shields.io/badge/Soroban-v23.1.4-blue.svg)](https://soroban.stellar.org/)
@@ -11,7 +11,7 @@ The platform provides a comprehensive solution for modern vision care data manag
 
 ---
 
-## 📑 Table of Contents
+## Table of Contents
 
 - [Project Overview](#-project-overview)
 - [Setup Instructions](#-setup-instructions)
@@ -32,7 +32,7 @@ The platform provides a comprehensive solution for modern vision care data manag
 
 ---
 
-## 🎯 Project Overview
+## Project Overview
 
 Stellar Teye transforms vision care record management by leveraging Stellar's blockchain infrastructure to create an immutable, secure, and patient-centric eye care data ecosystem. The system addresses critical healthcare challenges including data breaches, interoperability issues, and patient privacy concerns through cryptographic security and decentralized governance.
 
@@ -40,11 +40,11 @@ Stellar Teye transforms vision care record management by leveraging Stellar's bl
 
 | Benefit | Description |
 |---------|-------------|
-| 🔐 **Enhanced Security** | Military-grade encryption protects sensitive vision data |
-| 👤 **Patient Control** | Patients grant and revoke access to their records |
-| 🔄 **Interoperability** | Standardized format enables seamless data exchange |
-| 📜 **Audit Trail** | Complete, immutable history of all record access and modifications |
-| 👁️ **Vision-Specific** | Tailored for optometry and ophthalmology workflows |
+| **Enhanced Security** | Military-grade encryption protects sensitive vision data |
+| **Patient Control** | Patients grant and revoke access to their records |
+| **Interoperability** | Standardized format enables seamless data exchange |
+| **Audit Trail** | Complete, immutable history of all record access and modifications |
+| **Vision-Specific** | Tailored for optometry and ophthalmology workflows |
 
 ### Target Users
 
@@ -56,9 +56,9 @@ Stellar Teye transforms vision care record management by leveraging Stellar's bl
 
 ---
 
-## 🚀 Setup Instructions
+## Setup Instructions
 
-### ✅ Prerequisites
+### Prerequisites
 
 Before you begin, ensure you have the following installed:
 
@@ -67,7 +67,7 @@ Before you begin, ensure you have the following installed:
 - **Git** - For version control
 - **Make** - For using the provided Makefile (optional but recommended)
 
-### ⚡ Quick Start
+### Quick Start
 
 Get up and running in under 5 minutes:
 
@@ -84,7 +84,7 @@ chmod +x setup.sh
 make setup
 ```
 
-### 🔧 Environment Setup
+### Environment Setup
 
 #### Option 1: Automated Setup (Recommended)
 
@@ -125,7 +125,7 @@ cargo build --all-targets
 cargo test --all
 ```
 
-### 🧪 Running Tests
+### Running Tests
 
 Ensure everything is working correctly:
 
@@ -141,7 +141,7 @@ make test-unit          # Unit tests only
 make test-integration   # Integration tests only
 ```
 
-### 🌐 Network Configuration
+### Network Configuration
 
 The project supports multiple Stellar networks:
 
@@ -168,22 +168,22 @@ make stop-local
 
 ---
 
-## ✨ Features
+## Features
 
-- 📁 Encrypted on-chain vision care records storage
-- 🔐 Role-based access control (patients, optometrists, ophthalmologists, admins)
-- ⏱️ Immutable timestamping and full history tracking
-- 👁️ Comprehensive eye exam and prescription data management
-- 🔑 Public key-based identity verification
-- ⚙️ Fully testable, modular, and CI-enabled
-- 📦 Gas-efficient contract design
-- 🗳️ Decentralized governance with Governor + Timelock (proposals, voting, queued execution)
-- 📊 Vision health analytics and trend tracking
-- 🏥 Multi-provider record sharing
+- Encrypted on-chain vision care records storage
+- Role-based access control (patients, optometrists, ophthalmologists, admins)
+- Immutable timestamping and full history tracking
+- Comprehensive eye exam and prescription data management
+- Public key-based identity verification
+- Fully testable, modular, and CI-enabled
+- Gas-efficient contract design
+- Decentralized governance with Governor + Timelock (proposals, voting, queued execution)
+- Vision health analytics and trend tracking
+- Multi-provider record sharing
 
 ---
 
-## 🏗️ Project Structure
+## Project Structure
 
 ```
 Teye-Contracts/
@@ -220,7 +220,7 @@ Teye-Contracts/
 
 ---
 
-## 📖 Usage Examples
+## Usage Examples
 
 ### Basic Contract Interaction
 
@@ -256,7 +256,7 @@ make docs
 
 ---
 
-## 🚀 Deployment
+## Deployment
 
 ### Local Development
 
@@ -290,7 +290,7 @@ make deploy-mainnet
 
 ---
 
-## 🔄 CI/CD Pipeline
+## CI/CD Pipeline
 
 ### GitHub Actions Workflows
 
@@ -316,7 +316,7 @@ make deploy-mainnet
 
 ---
 
-## 🔗 Helpful Links
+## Helpful Links
 
 ### Documentation
 
@@ -338,7 +338,7 @@ make deploy-mainnet
 
 ---
 
-## 🤝 Contribution Guidelines
+## Contribution Guidelines
 
 We welcome contributions! Please follow these guidelines:
 
@@ -396,13 +396,13 @@ git push origin feature/issue-number-description
 
 ---
 
-## 📄 License
+## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ---
 
-## 🆘 Support
+## Support
 
 - **Issues**: [GitHub Issues](https://github.com/Stellar-Teye/Teye-Contracts/issues)
 - **Discussions**: [GitHub Discussions](https://github.com/Stellar-Teye/Teye-Contracts/discussions)
@@ -411,5 +411,5 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ---
 
 <p align="center">
-  Built with ❤️ on Stellar
+  Built with on Stellar
 </p>
