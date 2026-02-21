@@ -2,9 +2,9 @@ name: CI - Test and Build
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ master, develop, "feature/*" ]
   pull_request:
-    branches: [ main, develop ]
+    branches: [ master, develop ]
   workflow_dispatch:
 
 env:
