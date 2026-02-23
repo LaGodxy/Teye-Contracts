@@ -168,7 +168,7 @@ fn test_role_delegation_expiration() {
 }
 
 #[test]
-fn test_role_assignment_expiration() {    
+fn test_role_assignment_expiration() {
     let ctx = setup_test_env();
 
     let user = create_test_user(&ctx, Role::Patient, "User");
@@ -190,12 +190,11 @@ fn test_role_assignment_expiration() {
     ctx.env.as_contract(&ctx.client.address, || {
         vision_records::rbac::assign_role(&ctx.env, user.clone(), Role::Optometrist, 0);
     });
-    
+
     // Jump forward in time 10 years to ensure it never expires
     ctx.env.ledger().set_timestamp(315360000);
     assert!(ctx.client.check_permission(&user, &Permission::WriteRecord));
 }
-
 
 #[test]
 fn test_record_factory_creates_default_data() {
