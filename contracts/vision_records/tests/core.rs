@@ -200,3 +200,149 @@ fn test_events_and_version() {
     ctx.client.revoke_access(&user, &provider);
     assert_eq!(ctx.env.events().all().len(), 1); // Kills publish_access_revoked mutant
 }
+
+// ── Expiry & purge tests ─────────────────────────────────────────────────────
+
+#[test]
+fn test_check_access_returns_none_when_expired() {
+    let ctx = setup_test_env();
+    let patient = Address::generate(&ctx.env);
+    let doctor = Address::generate(&ctx.env);
+
+    ctx.env.ledger().set_timestamp(1_000);
+    ctx.client
+        .grant_access(&patient, &patient, &doctor, &AccessLevel::Read, &3_600);
+
+    // Still active just before expiry
+    ctx.env.ledger().set_timestamp(4_599);
+    assert_eq!(
+        ctx.client.check_access(&patient, &doctor),
+        AccessLevel::Read
+    );
+
+    // Expired at exact boundary
+    ctx.env.ledger().set_timestamp(4_600);
+    assert_eq!(
+        ctx.client.check_access(&patient, &doctor),
+        AccessLevel::None
+    );
+}
+
+#[test]
+fn test_purge_expired_grants_removes_expired() {
+    let ctx = setup_test_env();
+    let patient = Address::generate(&ctx.env);
+    let doctor1 = Address::generate(&ctx.env);
+    let doctor2 = Address::generate(&ctx.env);
+
+    ctx.env.ledger().set_timestamp(1_000);
+
+    // Grant short-lived access to doctor1, long-lived to doctor2
+    ctx.client
+        .grant_access(&patient, &patient, &doctor1, &AccessLevel::Read, &3_600);
+    ctx.client
+        .grant_access(&patient, &patient, &doctor2, &AccessLevel::Write, &86_400);
+
+    // Advance past doctor1's expiry but within doctor2's
+    ctx.env.ledger().set_timestamp(5_000);
+
+    // doctor1 is expired, doctor2 is still active
+    assert_eq!(
+        ctx.client.check_access(&patient, &doctor1),
+        AccessLevel::None
+    );
+    assert_eq!(
+        ctx.client.check_access(&patient, &doctor2),
+        AccessLevel::Write
+    );
+
+    // Purge — patient calls it themselves
+    let purged = ctx.client.purge_expired_grants(&patient, &patient);
+    assert_eq!(purged, 1);
+
+    // doctor2 still accessible
+    assert_eq!(
+        ctx.client.check_access(&patient, &doctor2),
+        AccessLevel::Write
+    );
+}
+
+#[test]
+fn test_purge_expired_grants_all_expired() {
+    let ctx = setup_test_env();
+    let patient = Address::generate(&ctx.env);
+    let doctor = Address::generate(&ctx.env);
+
+    ctx.env.ledger().set_timestamp(1_000);
+    ctx.client
+        .grant_access(&patient, &patient, &doctor, &AccessLevel::Full, &3_600);
+
+    // Advance well past expiry
+    ctx.env.ledger().set_timestamp(100_000);
+
+    let purged = ctx.client.purge_expired_grants(&patient, &patient);
+    assert_eq!(purged, 1);
+
+    // Grant storage is gone
+    assert_eq!(
+        ctx.client.check_access(&patient, &doctor),
+        AccessLevel::None
+    );
+}
+
+#[test]
+fn test_purge_expired_grants_none_expired() {
+    let ctx = setup_test_env();
+    let patient = Address::generate(&ctx.env);
+    let doctor = Address::generate(&ctx.env);
+
+    ctx.env.ledger().set_timestamp(1_000);
+    ctx.client
+        .grant_access(&patient, &patient, &doctor, &AccessLevel::Read, &86_400);
+
+    // Still within the grant window
+    ctx.env.ledger().set_timestamp(2_000);
+
+    let purged = ctx.client.purge_expired_grants(&patient, &patient);
+    assert_eq!(purged, 0);
+
+    // Access unchanged
+    assert_eq!(
+        ctx.client.check_access(&patient, &doctor),
+        AccessLevel::Read
+    );
+}
+
+#[test]
+fn test_purge_expired_grants_admin_can_call() {
+    let ctx = setup_test_env();
+    let patient = Address::generate(&ctx.env);
+    let doctor = Address::generate(&ctx.env);
+
+    ctx.env.ledger().set_timestamp(1_000);
+    ctx.client
+        .grant_access(&patient, &patient, &doctor, &AccessLevel::Read, &3_600);
+
+    ctx.env.ledger().set_timestamp(100_000);
+
+    // Admin purges on behalf of patient
+    let purged = ctx.client.purge_expired_grants(&ctx.admin, &patient);
+    assert_eq!(purged, 1);
+}
+
+#[test]
+fn test_purge_expired_grants_unauthorized_fails() {
+    let ctx = setup_test_env();
+    let patient = Address::generate(&ctx.env);
+    let stranger = Address::generate(&ctx.env);
+    let doctor = Address::generate(&ctx.env);
+
+    ctx.env.ledger().set_timestamp(1_000);
+    ctx.client
+        .grant_access(&patient, &patient, &doctor, &AccessLevel::Read, &3_600);
+
+    ctx.env.ledger().set_timestamp(100_000);
+
+    let result = ctx.client.try_purge_expired_grants(&stranger, &patient);
+    assert!(result.is_err());
+}

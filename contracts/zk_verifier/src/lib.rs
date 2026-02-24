@@ -32,6 +32,22 @@ pub enum ContractError {
     DegenerateProof = 3,
 }
 
+/// Maximum number of public inputs accepted per proof verification.
+const MAX_PUBLIC_INPUTS: u32 = 16;
+
+/// Contract errors for the ZK verifier.
+#[soroban_sdk::contracterror]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+#[repr(u32)]
+pub enum ContractError {
+    /// The public inputs vector is empty.
+    EmptyPublicInputs = 1,
+    /// Too many public inputs supplied.
+    TooManyPublicInputs = 2,
+    /// A proof component is all zeros (degenerate / trivially invalid).
+    DegenerateProof = 3,
+}
+
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct AccessRequest {

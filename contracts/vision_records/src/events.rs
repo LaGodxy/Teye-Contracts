@@ -146,6 +146,21 @@ pub fn publish_access_revoked(env: &Env, patient: Address, grantee: Address) {
     env.events().publish(topics, data);
 }
 
+pub fn publish_access_expired(
+    env: &Env,
+    patient: Address,
+    grantee: Address,
+    expired_at: u64,
+) {
+    let topics = (symbol_short!("ACC_EXP"), patient.clone(), grantee.clone());
+    let data = AccessExpiredEvent {
+        patient,
+        grantee,
+        expired_at,
+        purged_at: env.ledger().timestamp(),
+    };
+    env.events().publish(topics, data);
+}
 /// Event published when a new provider is registered.
 #[soroban_sdk::contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
