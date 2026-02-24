@@ -43,10 +43,10 @@ proptest! {
         let result = client.try_initialize(&second_admin);
 
         prop_assert!(result.is_err(), "Double initialize must always fail");
-        prop_assert_eq!(
-            result.unwrap_err().unwrap(),
-            ContractError::AlreadyInitialized
-        );
+        match result {
+            Err(Ok(e)) => prop_assert_eq!(e, ContractError::AlreadyInitialized),
+            _ => prop_assert!(false, "Expected AlreadyInitialized error"),
+        }
     }
 
     /// `is_initialized` must always return `true` after `initialize` succeeds.
@@ -96,7 +96,7 @@ proptest! {
         );
 
         // Provider adds a record for the patient
-        let hash = String::from_str(&env, "QmLifecycle");
+        let hash = String::from_str(&env, "lifecycle_hash_value_ffffffffffff");
         let record_id = client.add_record(
             &admin,
             &patient,

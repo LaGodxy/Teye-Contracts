@@ -1,3 +1,10 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::arithmetic_side_effects
+)]
+
 use super::{Permission, Role, VisionRecordsContract, VisionRecordsContractClient};
 use soroban_sdk::{testutils::Address as _, testutils::Ledger as _, Address, Env, String};
 

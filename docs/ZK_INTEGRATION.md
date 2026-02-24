@@ -11,13 +11,13 @@ The Stellar-Teye ZK Verifier employs:
 
 ## Architecture
 
-1. **Access Requests:** 
+1. **Access Requests:**
    Off-chain components leverage the `ZkAccessHelper` to format binary proofs (A, B, C points in Groth16 format) alongside the scalar Poseidon hashes of state boundaries into an interoperable Soroban Wasm execution format (`AccessRequest`).
 
-2. **On-Chain Verifier:** 
+2. **On-Chain Verifier:**
    The `ZkVerifierContract` handles the verification. It first requires caller authorization. Next, it validates the Groth16 proof pairing against the given `public_inputs` via the abstracted `Bn254Verifier` module.
 
-3. **Audit Trails:** 
+3. **Audit Trails:**
    Upon successful verification, the state is persisted into the ledger and an event log occurs tracking: `(user, resource_id, proof_hash, timestamp)`. The actual details behind the verification stay completely zero-knowledge, yielding a privacy-first infrastructure.
 
 ## Interaction
