@@ -1,5 +1,6 @@
-use crate::{CrossChainContract, CrossChainContractClient, CrossChainError, CrossChainMessage};
-use soroban_sdk::{symbol_short, testutils::Address as _, Address, Bytes, Env, String};
+#![allow(clippy::unwrap_used, clippy::expect_used)]
+use crate::{CrossChainContract, CrossChainContractClient};
+use soroban_sdk::{testutils::Address as _, Address, Env, String};
 
 #[test]
 fn test_initialization() {

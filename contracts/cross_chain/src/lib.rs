@@ -60,11 +60,7 @@ impl CrossChainContract {
     /// Add a trusted relayer allowed to submit cross-chain messages
     pub fn add_relayer(env: Env, caller: Address, relayer: Address) -> Result<(), CrossChainError> {
         caller.require_auth();
-        let admin: Address = env
-            .storage()
-            .instance()
-            .get(&ADMIN)
-            .ok_or(CrossChainError::NotInitialized)?;
+        let admin: Address = env.storage().instance().get(&ADMIN).ok_or(CrossChainError::NotInitialized)?;
         if caller != admin {
             return Err(CrossChainError::Unauthorized);
         }
@@ -101,11 +97,7 @@ impl CrossChainContract {
         local_address: Address,
     ) -> Result<(), CrossChainError> {
         caller.require_auth();
-        let admin: Address = env
-            .storage()
-            .instance()
-            .get(&ADMIN)
-            .ok_or(CrossChainError::NotInitialized)?;
+        let admin: Address = env.storage().instance().get(&ADMIN).ok_or(CrossChainError::NotInitialized)?;
         if caller != admin {
             return Err(CrossChainError::Unauthorized);
         }
@@ -180,13 +172,7 @@ impl CrossChainContract {
             return Err(CrossChainError::UnknownIdentity);
         }
 
-        // Mark as processed only after all validation passes
-        env.storage().persistent().set(&processed_key, &true);
-        env.storage()
-            .persistent()
-            .extend_ttl(&processed_key, TTL_THRESHOLD, TTL_EXTEND_TO);
-
-        let _patient_addr = local_patient.unwrap();
+        let _patient_addr = local_patient.ok_or(CrossChainError::UnknownIdentity)?;
 
         // Handle the message based on target action
         if message.target_action == symbol_short!("GRANT") {

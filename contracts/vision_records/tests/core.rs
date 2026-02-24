@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::arithmetic_side_effects)]
 mod common;
 
 use common::{create_test_record, create_test_user, setup_test_env};
@@ -135,7 +136,6 @@ fn test_add_record_unauthorized_and_admin() {
     let patient = create_test_user(&ctx, Role::Patient, "Patient");
     let random_user = create_test_user(&ctx, Role::Patient, "Random");
     let hash = String::from_str(&ctx.env, "cccccccccccccccccccccccccccccccc");
-
     // Random user cannot add typical record
     let res = ctx.client.try_add_record(
         &random_user,
