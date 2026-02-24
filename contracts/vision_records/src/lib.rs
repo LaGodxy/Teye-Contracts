@@ -1,42 +1,45 @@
 #![no_std]
 #![allow(clippy::too_many_arguments)]
+pub mod appointment;
+pub mod audit;
 pub mod circuit_breaker;
+pub mod emergency;
+pub mod errors;
 pub mod events;
+pub mod examination;
+pub mod patient_profile;
 pub mod prescription;
+pub mod provider;
+pub mod rate_limit;
 pub mod rbac;
 pub mod validation;
 
-pub mod appointment;
-pub mod audit;
-pub mod emergency;
-pub mod errors;
-pub mod examination;
-pub mod provider;
-pub mod rate_limit;
-
-pub mod patient_profile;
-
-use crate::audit::{AccessAction, AccessResult};
-use crate::prescription::{LensType, OptionalContactLensData, Prescription, PrescriptionData};
-use common::whitelist;
 use soroban_sdk::{
     contract, contractimpl, contracttype, symbol_short, Address, Env, String, Symbol, Vec,
 };
 
-use crate::patient_profile::{
+use teye_common::whitelist;
+
+/// Re-export the contract-specific error type at the crate root.
+pub use errors::ContractError;
+
+/// Re-export provider types needed by other modules (e.g. events).
+pub use provider::VerificationStatus;
+
+/// Re-export error helpers used throughout the contract.
+pub use errors::{create_error_context, log_error};
+
+/// Re-export types from submodules used directly in the contract impl.
+pub use audit::{AccessAction, AccessResult};
+pub use examination::{
+    EyeExamination, IntraocularPressure, OptFundusPhotography, OptRetinalImaging, OptVisualField,
+    SlitLampFindings, VisualAcuity,
+};
+pub use patient_profile::{
     EmergencyContact, InsuranceInfo, OptionalEmergencyContact, OptionalInsuranceInfo,
     PatientProfile,
 };
-pub use errors::{
-    create_error_context, log_error, ContractError, ErrorCategory, ErrorLogEntry, ErrorSeverity,
-};
-pub use examination::{
-    EyeExamination, FundusPhotography, IntraocularPressure, OptFundusPhotography,
-    OptPhysicalMeasurement, OptRetinalImaging, OptVisualField, PhysicalMeasurement, RetinalImaging,
-    SlitLampFindings, VisualAcuity, VisualField,
-};
-pub use provider::{Certification, License, Location, Provider, VerificationStatus};
-pub use rate_limit::{RateLimitConfig, RateLimitStats, RateLimitStatus};
+pub use prescription::{LensType, OptionalContactLensData, Prescription, PrescriptionData};
 
 /// Storage keys for the contract
 const ADMIN: Symbol = symbol_short!("ADMIN");
@@ -176,8 +179,9 @@ pub struct AccessGrant {
     pub expires_at: u64,
 }
 
+/// Consent grant structure for patient-to-provider consent tracking
 #[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug)]
 pub struct ConsentGrant {
     pub patient: Address,
     pub grantee: Address,
@@ -189,16 +193,16 @@ pub struct ConsentGrant {
 
 /// Input for batch record creation
 #[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug)]
 pub struct BatchRecordInput {
     pub patient: Address,
     pub record_type: RecordType,
     pub data_hash: String,
 }
 
-/// Input for batch access grants
+/// Input for batch access granting
 #[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug)]
 pub struct BatchGrantInput {
     pub grantee: Address,
     pub level: AccessLevel,
@@ -546,12 +550,7 @@ impl VisionRecordsContract {
 
         // Generate record ID
         let counter_key = symbol_short!("REC_CTR");
-        let record_id: u64 = env
-            .storage()
-            .instance()
-            .get(&counter_key)
-            .unwrap_or(0u64)
-            .saturating_add(1u64);
+        let record_id: u64 = env.storage().instance().get(&counter_key).unwrap_or(0) + 1;
         env.storage().instance().set(&counter_key, &record_id);
 
         let record = VisionRecord {
@@ -579,7 +578,6 @@ impl VisionRecordsContract {
         env.storage()
             .persistent()
             .set(&patient_key, &patient_records);
-        extend_ttl_address_key(&env, &patient_key);
 
         Ok(record_id)
     }
@@ -1125,14 +1123,9 @@ impl VisionRecordsContract {
     /// Revoke access
     pub fn revoke_access(
         env: Env,
-        caller: Address,
         patient: Address,
         grantee: Address,
     ) -> Result<(), ContractError> {
-        circuit_breaker::require_not_paused(
-            &env,
-            &circuit_breaker::PauseScope::Function(symbol_short!("REV_ACC")),
-        )?;
         patient.require_auth();
 
         let key = (symbol_short!("ACCESS"), patient.clone(), grantee.clone());
@@ -1141,7 +1134,7 @@ impl VisionRecordsContract {
         // Log successful access revoke
         let audit_entry = audit::create_audit_entry(
             &env,
-            caller.clone(),
+            patient.clone(),
             patient.clone(),
             None,
             AccessAction::RevokeAccess,
@@ -1507,8 +1500,6 @@ impl VisionRecordsContract {
         let profile_key = (symbol_short!("PAT_PROF"), patient);
         env.storage().persistent().has(&profile_key)
     }
-
-    // ======================== RBAC Endpoints ========================
 
     /// Grants a custom permission to a user.
     /// Requires the caller to have ManageUsers permission.
