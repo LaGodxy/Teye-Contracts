@@ -3,9 +3,7 @@
 #[cfg(test)]
 mod test;
 
-use soroban_sdk::{
-    contract, contractimpl, contracttype, symbol_short, Address, Env, Symbol, Vec,
-};
+use soroban_sdk::{contract, contractimpl, contracttype, symbol_short, Address, Env, Symbol, Vec};
 
 // ── Storage keys ────────────────────────────────────────────────────────────────
 
