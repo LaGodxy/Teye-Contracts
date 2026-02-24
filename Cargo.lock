@@ -15,6 +15,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "ai_integration"
+version = "1.2.2"
+dependencies = [
+ "soroban-sdk",
+]
+
+[[package]]
 name = "analytics"
 version = "1.2.2"
 dependencies = [
