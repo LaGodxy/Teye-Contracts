@@ -140,6 +140,14 @@ pub struct ProviderRegisteredEvent {
     pub timestamp: u64,
 }
 
+/// Event published when an eye examination is added to a record.
+#[soroban_sdk::contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ExaminationAddedEvent {
+    pub record_id: u64,
+    pub timestamp: u64,
+}
+
 /// Event published when a provider's verification status is updated.
 #[soroban_sdk::contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -199,6 +207,17 @@ pub fn publish_provider_updated(env: &Env, provider: Address) {
     let topics = (symbol_short!("PROV_UPD"), provider.clone());
     let data = ProviderUpdatedEvent {
         provider,
+        timestamp: env.ledger().timestamp(),
+    };
+    env.events().publish(topics, data);
+}
+
+/// Publishes an event when an examination is added.
+/// This event includes the record ID.
+pub fn publish_examination_added(env: &Env, record_id: u64) {
+    let topics = (symbol_short!("EXAM_ADD"), record_id);
+    let data = ExaminationAddedEvent {
+        record_id,
         timestamp: env.ledger().timestamp(),
     };
     env.events().publish(topics, data);
