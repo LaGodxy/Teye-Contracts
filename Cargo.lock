@@ -279,6 +279,9 @@ dependencies = [
 [[package]]
 name = "common"
 version = "1.2.2"
+dependencies = [
+ "soroban-sdk",
+]
 
 [[package]]
 name = "compliance"
@@ -635,6 +638,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "fhir"
+version = "1.2.2"
+dependencies = [
+ "soroban-sdk",
+]
+
+[[package]]
 name = "fiat-crypto"
 version = "0.2.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -818,7 +828,6 @@ checksum = "b9e0384b61958566e926dc50660321d12159025e767c18e043daf26b70104c39"
 name = "identity"
 version = "1.2.2"
 dependencies = [
- "common",
  "soroban-sdk",
 ]
 
@@ -1792,8 +1801,10 @@ checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
 
 [[package]]
 name = "vision_records"
-version = "1.0.0"
+version = "1.2.2"
 dependencies = [
+ "common",
+ "ed25519-dalek",
  "proptest",
  "proptest-derive",
  "soroban-sdk",
@@ -2148,6 +2159,7 @@ dependencies = [
 name = "zk_verifier"
 version = "1.2.2"
 dependencies = [
+ "common",
  "soroban-sdk",
 ]
 

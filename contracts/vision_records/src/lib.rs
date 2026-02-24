@@ -18,6 +18,7 @@ use soroban_sdk::{
     contract, contracterror, contractimpl, contracttype, symbol_short, Address, Env, String,
     Symbol, Vec,
 };
+use common::whitelist;
 
 use crate::patient_profile::{EmergencyContact, InsuranceInfo, PatientProfile};
 pub use errors::{
@@ -309,6 +310,59 @@ impl VisionRecordsContract {
         env.storage().instance().get(&RATE_CFG)
     }
 
+    /// Enables or disables whitelist enforcement globally.
+    pub fn set_whitelist_enabled(
+        env: Env,
+        caller: Address,
+        enabled: bool,
+    ) -> Result<(), ContractError> {
+        caller.require_auth();
+        let admin = Self::get_admin(env.clone())?;
+        if caller != admin {
+            return Err(ContractError::Unauthorized);
+        }
+        whitelist::set_whitelist_enabled(&env, enabled);
+        Ok(())
+    }
+
+    /// Adds an address to the whitelist. Admin-only.
+    pub fn add_to_whitelist(
+        env: Env,
+        caller: Address,
+        user: Address,
+    ) -> Result<(), ContractError> {
+        caller.require_auth();
+        let admin = Self::get_admin(env.clone())?;
+        if caller != admin {
+            return Err(ContractError::Unauthorized);
+        }
+        whitelist::add_to_whitelist(&env, &user);
+        Ok(())
+    }
+
+    /// Removes an address from the whitelist. Admin-only.
+    pub fn remove_from_whitelist(
+        env: Env,
+        caller: Address,
+        user: Address,
+    ) -> Result<(), ContractError> {
+        caller.require_auth();
+        let admin = Self::get_admin(env.clone())?;
+        if caller != admin {
+            return Err(ContractError::Unauthorized);
+        }
+        whitelist::remove_from_whitelist(&env, &user);
+        Ok(())
+    }
+
+    pub fn is_whitelist_enabled(env: Env) -> bool {
+        whitelist::is_whitelist_enabled(&env)
+    }
+
+    pub fn is_whitelisted(env: Env, user: Address) -> bool {
+        whitelist::is_whitelisted(&env, &user)
+    }
+
     /// Register a new user
     pub fn register_user(
         env: Env,
@@ -322,6 +376,10 @@ impl VisionRecordsContract {
             &circuit_breaker::PauseScope::Function(symbol_short!("REG_USR")),
         )?;
         caller.require_auth();
+
+        if !whitelist::require_whitelisted(&env, &caller) {
+            return Err(ContractError::Unauthorized);
+        }
 
         // Unified check: covers direct role, custom grants, and delegated roles
         if !rbac::has_permission(&env, &caller, &Permission::ManageUsers) {
@@ -412,6 +470,10 @@ impl VisionRecordsContract {
             &circuit_breaker::PauseScope::Function(symbol_short!("ADD_REC")),
         )?;
         caller.require_auth();
+
+        if !whitelist::require_whitelisted(&env, &caller) {
+            return Err(ContractError::Unauthorized);
+        }
 
         Self::enforce_rate_limit(&env, &caller)?;
 
@@ -1322,6 +1384,7 @@ impl VisionRecordsContract {
     pub fn check_permission(env: Env, user: Address, permission: Permission) -> bool {
         rbac::has_permission(&env, &user, &permission)
     }
+}
 
 #[cfg(test)]
 mod test;
