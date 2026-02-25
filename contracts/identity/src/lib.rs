@@ -416,6 +416,7 @@ impl IdentityContract {
         proof_b: VkG2Point,
         proof_c: VkG1Point,
         public_inputs: Vec<BytesN<32>>,
+        expires_at: u64,
     ) -> Result<bool, CredentialError> {
         user.require_auth();
         let result = credential::verify_zk_credential(
@@ -426,6 +427,7 @@ impl IdentityContract {
             proof_b,
             proof_c,
             public_inputs,
+            expires_at,
             0, // Default nonce; caller should set appropriately for replay protection
         )
     }

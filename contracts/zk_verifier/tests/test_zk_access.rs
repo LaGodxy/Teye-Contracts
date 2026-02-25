@@ -2,7 +2,6 @@
 #![cfg(test)]
 
 use soroban_sdk::{
-    symbol_short,
     testutils::{Address as _, Events, Ledger},
     xdr::{ContractEventBody, ScVal},
     Address, BytesN, Env, IntoVal, TryFromVal, Vec,
@@ -130,6 +129,7 @@ fn test_valid_proof_verification_and_audit() {
         proof_b,
         proof_c,
         &[&pi],
+        env.ledger().timestamp() + 1000,
     );
 
     // With real BN254 operations, the cross-contract call will either
@@ -181,6 +181,7 @@ fn test_invalid_proof_verification() {
         proof_b,
         proof_c,
         &[&pi],
+        env.ledger().timestamp() + 1000,
     );
 
     // With real BN254 crypto, invalid data causes either false or an error.
@@ -227,11 +228,18 @@ fn test_verify_access_cpu_budget_valid_proof() {
     let mut pi = [0u8; 32];
     pi[0] = 1;
 
-    let request =
-        ZkAccessHelper::create_request(&env, user, resource_id, proof_a, proof_b, proof_c, &[&pi]);
+    let request = ZkAccessHelper::create_request(
+        &env,
+        user,
+        resource_id,
+        proof_a,
+        proof_b,
+        proof_c,
+        &[&pi],
+        env.ledger().timestamp() + 1000,
+    );
 
-    #[allow(deprecated)]
-    let mut budget = env.budget();
+    let mut budget = env.cost_estimate().budget();
     budget.reset_default();
     budget.reset_tracker();
 
@@ -277,11 +285,18 @@ fn test_verify_access_cpu_budget_invalid_proof() {
     let mut pi = [0u8; 32];
     pi[0] = 1;
 
-    let request =
-        ZkAccessHelper::create_request(&env, user, resource_id, proof_a, proof_b, proof_c, &[&pi]);
+    let request = ZkAccessHelper::create_request(
+        &env,
+        user,
+        resource_id,
+        proof_a,
+        proof_b,
+        proof_c,
+        &[&pi],
+        env.ledger().timestamp() + 1000,
+    );
 
-    #[allow(deprecated)]
-    let mut budget = env.budget();
+    let mut budget = env.cost_estimate().budget();
     budget.reset_default();
     budget.reset_tracker();
 
@@ -323,6 +338,7 @@ fn test_rate_limit_enforcement_and_reset() {
         [0u8; 128],
         [0u8; 64],
         &[&pi],
+        env.ledger().timestamp() + 1000,
     );
 
     // --- Test 1: With no rate limit configured, calls are not rate-limited. ---
@@ -407,6 +423,7 @@ fn test_whitelist_enforcement_and_toggle() {
         proof_b,
         proof_c,
         &[&pi],
+        env.ledger().timestamp() + 1000,
     );
     // Whitelisted user passes whitelist check (may still fail pairing).
     let allowed_result = client.try_verify_access(&allowed_request);
@@ -423,6 +440,7 @@ fn test_whitelist_enforcement_and_toggle() {
         proof_b,
         proof_c,
         &[&pi],
+        env.ledger().timestamp() + 1000,
     );
     let blocked = client.try_verify_access(&blocked_request);
     assert!(blocked.is_err());
@@ -513,6 +531,7 @@ fn test_empty_public_inputs_rejected() {
             c
         },
         &[], // empty public inputs
+        env.ledger().timestamp() + 1000,
     );
 
     let res = client.try_verify_access(&request);
@@ -580,6 +599,7 @@ fn test_zeroed_proof_bytes_rejected() {
             c
         },
         &[&pi],
+        env.ledger().timestamp() + 1000,
     );
     let res_a = client.try_verify_access(&request_zero_a);
     assert!(
@@ -608,6 +628,7 @@ fn test_zeroed_proof_bytes_rejected() {
             c
         },
         &[&pi],
+        env.ledger().timestamp() + 1000,
     );
     let res_b = client.try_verify_access(&request_zero_b);
     assert!(
@@ -636,6 +657,7 @@ fn test_zeroed_proof_bytes_rejected() {
         },
         [0u8; 64],
         &[&pi],
+        env.ledger().timestamp() + 1000,
     );
     let res_c = client.try_verify_access(&request_zero_c);
     assert!(
@@ -670,6 +692,7 @@ fn test_all_proof_components_zeroed_rejected() {
         [0u8; 128], // all zero b
         [0u8; 64],  // all zero c
         &[&pi],
+        env.ledger().timestamp() + 1000,
     );
     let res = client.try_verify_access(&request);
     assert!(res.is_err(), "Fully zeroed proof must be rejected");
@@ -722,6 +745,7 @@ fn test_oversized_public_inputs_rejected() {
             c
         },
         &input_refs,
+        env.ledger().timestamp() + 1000,
     );
     let res = client.try_verify_access(&request);
     assert!(res.is_err(), "More than 16 public inputs must be rejected");
@@ -765,6 +789,7 @@ fn test_malformed_proof_first_byte_not_one() {
             c
         },
         &[&pi],
+        env.ledger().timestamp() + 1000,
     );
 
     let result = client.try_verify_access(&request);
@@ -811,6 +836,7 @@ fn test_malformed_public_input_first_byte_not_one() {
         proof_b,
         proof_c,
         &[&bad_pi],
+        env.ledger().timestamp() + 1000,
     );
   
     ));
@@ -867,6 +893,7 @@ fn test_exactly_max_public_inputs_accepted() {
             c
         },
         &input_refs,
+        env.ledger().timestamp() + 1000,
     );
 
     // With 16 inputs the request should pass input-count validation.
@@ -959,6 +986,46 @@ fn test_audit_chain_integrity() {
     let contract_id = env.register_contract(None, ZkVerifierContract);
     let client = ZkVerifierContractClient::new(&env, &contract_id);
     let user = Address::generate(&env);
+    let resource_id = [20u8; 32];
+    let rid = BytesN::from_array(&env, &resource_id);
+
+    let mut proof_a = [0u8; 64];
+    proof_a[0] = 1;
+    proof_a[32] = 0x02;
+    let mut proof_b = [0u8; 128];
+    proof_b[0] = 1;
+    proof_b[32] = 0x02;
+    proof_b[64] = 0x03;
+    proof_b[96] = 0x04;
+    let mut proof_c = [0u8; 64];
+    proof_c[0] = 1;
+    proof_c[32] = 0x02;
+    let mut pi = [0u8; 32];
+    pi[0] = 1;
+
+    let request = ZkAccessHelper::create_request(
+        &env,
+        user.clone(),
+        resource_id,
+        proof_a,
+        proof_b,
+        proof_c,
+        &[&pi],
+        env.ledger().timestamp() + 10000,
+    );
+
+    // First verification — first record has zero prev_hash
+    assert!(client.verify_access(&request));
+    let first = client.get_audit_record(&user, &rid).unwrap();
+    assert_eq!(first.prev_hash, BytesN::from_array(&env, &[0u8; 32]));
+
+    // Advance ledger to get a distinct timestamp
+    env.ledger().set_timestamp(env.ledger().timestamp() + 10);
+
+    // Second verification — chained to first
+    assert!(client.verify_access(&request));
+    let second = client.get_audit_record(&user, &rid).unwrap();
+    assert_ne!(second.prev_hash, BytesN::from_array(&env, &[0u8; 32]));
     let resource_id = BytesN::from_array(&env, &[0x14; 32]);
 
     // 2️⃣ Reset the nonce for this user to 0
@@ -1047,5 +1114,163 @@ fn test_audit_chain_empty_is_valid() {
     assert!(
         client.verify_audit_chain(&user, &rid),
         "Empty audit chain should be valid"
+    );
+}
+
+#[test]
+fn test_expired_proof_rejected() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let contract_id = env.register(ZkVerifierContract, ());
+    let client = ZkVerifierContractClient::new(&env, &contract_id);
+
+    let admin = Address::generate(&env);
+    client.initialize(&admin);
+
+    let vk = setup_vk(&env);
+    client.set_verification_key(&admin, &vk);
+
+    let user = Address::generate(&env);
+    let resource_id = [30u8; 32];
+
+    let mut proof_a = [0u8; 64];
+    proof_a[0] = 1;
+    proof_a[32] = 0x02;
+    let mut proof_b = [0u8; 128];
+    proof_b[0] = 1;
+    proof_b[32] = 0x02;
+    proof_b[64] = 0x03;
+    proof_b[96] = 0x04;
+    let mut proof_c = [0u8; 64];
+    proof_c[0] = 1;
+    proof_c[32] = 0x02;
+    let mut pi = [0u8; 32];
+    pi[0] = 1;
+
+    // Set ledger timestamp to 500, but expires_at to 100 (already expired).
+    env.ledger().set_timestamp(500);
+
+    let request = ZkAccessHelper::create_request(
+        &env,
+        user.clone(),
+        resource_id,
+        proof_a,
+        proof_b,
+        proof_c,
+        &[&pi],
+        100, // expired
+    );
+
+    let res = client.try_verify_access(&request);
+    assert!(res.is_err(), "Expired proof must be rejected");
+    assert!(matches!(
+        res.unwrap_err(),
+        Ok(ContractError::ExpiredProof)
+    ));
+}
+
+#[test]
+fn test_valid_timestamp_accepted() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let contract_id = env.register(ZkVerifierContract, ());
+    let client = ZkVerifierContractClient::new(&env, &contract_id);
+
+    let admin = Address::generate(&env);
+    client.initialize(&admin);
+
+    let vk = setup_vk(&env);
+    client.set_verification_key(&admin, &vk);
+
+    let user = Address::generate(&env);
+    let resource_id = [31u8; 32];
+
+    let mut proof_a = [0u8; 64];
+    proof_a[0] = 1;
+    proof_a[32] = 0x02;
+    let mut proof_b = [0u8; 128];
+    proof_b[0] = 1;
+    proof_b[32] = 0x02;
+    proof_b[64] = 0x03;
+    proof_b[96] = 0x04;
+    let mut proof_c = [0u8; 64];
+    proof_c[0] = 1;
+    proof_c[32] = 0x02;
+    let mut pi = [0u8; 32];
+    pi[0] = 1;
+
+    let request = ZkAccessHelper::create_request(
+        &env,
+        user.clone(),
+        resource_id,
+        proof_a,
+        proof_b,
+        proof_c,
+        &[&pi],
+        env.ledger().timestamp() + 1000,
+    );
+
+    // Should NOT fail with ExpiredProof — may fail at BN254 level, but not expiry.
+    let result = client.try_verify_access(&request);
+    assert!(
+        !matches!(result, Err(Ok(ContractError::ExpiredProof))),
+        "Valid timestamp should not trigger ExpiredProof"
+    );
+}
+
+#[test]
+fn test_audit_record_contains_expires_at() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let contract_id = env.register(ZkVerifierContract, ());
+    let client = ZkVerifierContractClient::new(&env, &contract_id);
+
+    let admin = Address::generate(&env);
+    client.initialize(&admin);
+
+    let vk = setup_vk(&env);
+    client.set_verification_key(&admin, &vk);
+
+    let user = Address::generate(&env);
+    let resource_id = [32u8; 32];
+    let rid = BytesN::from_array(&env, &resource_id);
+
+    let mut proof_a = [0u8; 64];
+    proof_a[0] = 1;
+    proof_a[32] = 0x02;
+    let mut proof_b = [0u8; 128];
+    proof_b[0] = 1;
+    proof_b[32] = 0x02;
+    proof_b[64] = 0x03;
+    proof_b[96] = 0x04;
+    let mut proof_c = [0u8; 64];
+    proof_c[0] = 1;
+    proof_c[32] = 0x02;
+    let mut pi = [0u8; 32];
+    pi[0] = 1;
+
+    let expires_at = env.ledger().timestamp() + 5000;
+
+    let request = ZkAccessHelper::create_request(
+        &env,
+        user.clone(),
+        resource_id,
+        proof_a,
+        proof_b,
+        proof_c,
+        &[&pi],
+        expires_at,
+    );
+
+    let is_valid = client.verify_access(&request);
+    assert!(is_valid, "Proof should be accepted");
+
+    let record = client.get_audit_record(&user, &rid).unwrap();
+    assert_eq!(
+        record.expires_at, expires_at,
+        "AuditRecord must store the expires_at from the request"
     );
 }

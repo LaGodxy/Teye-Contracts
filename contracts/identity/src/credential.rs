@@ -72,6 +72,7 @@ pub fn verify_zk_credential(
     proof_b: VkG2Point,
     proof_c: VkG1Point,
     public_inputs: Vec<BytesN<32>>,
+    expires_at: u64,
     nonce: u64,
 ) -> Result<bool, CredentialError> {
     // 1. Load verifier contract address.
@@ -102,6 +103,7 @@ pub fn verify_zk_credential(
         resource_id: resource_id.clone(),
         proof,
         public_inputs,
+        expires_at,
         nonce,
     };
 
