@@ -14,6 +14,7 @@ members = [
     "contracts/cross_chain",
     "contracts/analytics",
     "contracts/treasury",
+    "contracts/audit",
     "contracts/emr_bridge",
     "contracts/metering",
     "sdk/zk_prover",
