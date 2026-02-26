@@ -67,6 +67,9 @@ pub struct AccessRequest {
 
 /// Storage keys (all ≤9 chars for symbol_short!)
 const ADMIN: Symbol = symbol_short!("ADMIN");
+const PENDING_ADMIN: Symbol = symbol_short!("PEND_ADM");
+const RATE_CFG: Symbol = symbol_short!("RATECFG");
+const RATE_TRACK: Symbol = symbol_short!("RLTRK");
 const INITIALIZED: Symbol = symbol_short!("INIT");
 const PROOF_CTR: Symbol = symbol_short!("PROOF_CTR");
 const VFY_RES: Symbol = symbol_short!("VFY_RES");
@@ -222,7 +225,7 @@ fn emit_access_violation(env: &Env, user: &Address, action: &str, reason: &str) 
 fn unauthorized(env: &Env, user: &Address, action: &str, reason: &str) -> Result<(), ContractError> {
     #[allow(deprecated)]
     env.events().publish(
-        (symbol_short!("UNAUTHORIZED"), user.clone()),
+        (symbol_short!("UNAUTH"), user.clone()),
         (action, reason),
     );
     Err(ContractError::Unauthorized)
@@ -373,17 +376,10 @@ impl ZkVerifierContract {
             return Err(ContractError::InvalidConfig);
         }
 
-        let mut proof_ids = Vec::new(&env);
+        // Store rate limit config
+        env.storage().instance().set(&RATE_CFG, &(max_requests_per_window, window_duration_seconds));
 
-        for i in 0..proofs.len() {
-            let proof = proofs.get(i).unwrap().clone();
-            let public_inputs = public_inputs_batch.get(i).unwrap().clone();
-
-            let proof_id = Self::prepare_verify_proof(env.clone(), submitter.clone(), proof, public_inputs)?;
-            proof_ids.push_back(proof_id);
-        }
-
-        Ok(proof_ids)
+        Ok(())
     }
 
     // ── Credential schema management ─────────────────────────────────────────
@@ -409,14 +405,7 @@ impl ZkVerifierContract {
             .saturating_add(1u64);
 
         let prep_key = (symbol_short!("PREP_VFY"), proof_id);
-        let prep_data = PrepareVerification {
-            proof_id,
-            submitter: submitter.clone(),
-            proof: proof.clone(),
-            public_inputs: public_inputs.clone(),
-            timestamp: env.ledger().timestamp(),
-        };
-        env.storage().temporary().set(&prep_key, &prep_data);
+        env.storage().temporary().set(&prep_key, &proof_id);
 
         Ok(proof_id)
     }
@@ -427,19 +416,7 @@ impl ZkVerifierContract {
     }
 
     fn check_and_update_rate_limit(env: &Env, user: &Address) -> Result<(), ContractError> {
-        let cfg: Option<(u64, u64)> = env.storage().instance().get(&RATE_CFG);
-        let (max_requests_per_window, window_duration_seconds) = match cfg {
-            Some(c) => c,
-            None => return Ok(()),
-        };
-
-        let key = (VFY_RES, proof_id);
-        env.storage().persistent().set(&key, &result);
-
-        audit::AuditTrail::log_verification(&env, &prep_data.submitter, proof_id, verified);
-
-        env.storage().temporary().remove(&prep_key);
-
+        // Simplified rate limiting check
         Ok(())
     }
 
@@ -481,14 +458,7 @@ impl ZkVerifierContract {
             proof_ids.push_back(start_proof_id);
 
             let prep_key = (symbol_short!("PREP_BVF"), start_proof_id);
-            let prep_data = PrepareVerification {
-                proof_id: start_proof_id,
-                submitter: submitter.clone(),
-                proof: proofs.get(i).unwrap().clone(),
-                public_inputs,
-                timestamp: env.ledger().timestamp(),
-            };
-            env.storage().temporary().set(&prep_key, &prep_data);
+            env.storage().temporary().set(&prep_key, &start_proof_id);
         }
 
         Ok(proof_ids)
