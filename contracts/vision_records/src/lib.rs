@@ -1034,6 +1034,9 @@ impl VisionRecordsContract {
             .persistent()
             .set(&patient_key, &patient_records);
 
+        // Initialize OCC version tracking
+        teye_common::concurrency::init_record_version(&env, record_id, 1);
+
         Ok(record_id)
     }
 
@@ -1152,6 +1155,8 @@ impl VisionRecordsContract {
             );
 
             record_ids.push_back(current_id);
+            // Initialize OCC version tracking
+            teye_common::concurrency::init_record_version(&env, current_id, 1);
         }
 
         env.storage().instance().set(&counter_key, &current_id);

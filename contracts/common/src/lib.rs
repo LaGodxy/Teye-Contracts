@@ -27,8 +27,11 @@ pub mod conflict_resolver;
 #[cfg(feature = "std")]
 pub mod consent;
 pub mod keys;
+/// On-chain DAG provenance data model and storage primitives.
+pub mod lineage;
 pub mod meta_tx;
 pub mod metering;
+pub mod migration;
 pub mod multisig;
 pub mod nonce;
 pub mod pausable;
@@ -39,18 +42,28 @@ pub mod reentrancy_guard;
 pub mod session;
 pub mod risk_engine;
 pub mod vector_clock;
+pub mod versioned_storage;
 pub mod whitelist;
 pub mod transaction;
 
 pub mod credential_types;
 
 pub use admin_tiers::*;
-pub use concurrency::*;
+pub use concurrency::{
+    compare_and_swap, get_pending_conflicts, get_record_conflicts, get_resolution_strategy as get_occ_strategy,
+    resolve_conflict, set_resolution_strategy as set_occ_strategy, ConflictEntry,
+    ResolutionStrategy as OCCStrategy, UpdateOutcome, VersionStamp,
+};
 #[cfg(feature = "std")]
 pub use consent::*;
 pub use keys::*;
+pub use lineage::{
+    LineageEdge, LineageNode, LineageSummary, RelationshipKind, TraversalNode, TraversalResult,
+    VerificationResult,
+};
 pub use meta_tx::*;
 pub use metering::*;
+pub use migration::*;
 pub use multisig::*;
 pub use nonce::*;
 pub use rate_limit::*;
@@ -58,6 +71,7 @@ pub use reentrancy_guard::*;
 pub use session::*;
 pub use risk_engine::*;
 pub use vector_clock::*;
+pub use versioned_storage::*;
 pub use whitelist::*;
 pub use credential_types::*;
 
@@ -126,5 +140,12 @@ mod tests {
         assert_eq!(CommonError::InvalidNonce as u32, 31);
         assert_eq!(CommonError::NonceOverflow as u32, 32);
         assert_eq!(CommonError::Paused as u32, 40);
+        // Lineage range.
+        assert_eq!(CommonError::LineageNodeNotFound as u32, 60);
+        assert_eq!(CommonError::LineageEdgeNotFound as u32, 61);
+        assert_eq!(CommonError::LineageAncestorMissing as u32, 62);
+        assert_eq!(CommonError::LineageTampered as u32, 63);
+        assert_eq!(CommonError::LineageCycleDetected as u32, 64);
+        assert_eq!(CommonError::LineageAccessDenied as u32, 65);
     }
 }
