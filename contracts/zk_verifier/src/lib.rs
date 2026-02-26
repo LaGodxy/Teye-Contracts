@@ -28,7 +28,6 @@ pub use crate::audit::{AuditRecord, AuditTrail};
 pub use crate::credentials::CredentialManager;
 pub use crate::events::AccessRejectedEvent;
 pub use crate::helpers::ZkAccessHelper;
-pub use crate::verifier::{Bn254Verifier, PoseidonHasher, Proof, ProofValidationError, VerificationKey};
 pub use crate::verifier::{Bn254Verifier, PoseidonHasher, Proof, ProofValidationError};
 pub use crate::vk::VerificationKey;
 
@@ -39,10 +38,7 @@ use soroban_sdk::{
 };
 // use verifier::ProofValidationError;
 
-const ADMIN: Symbol = symbol_short!("ADMIN");
-const PENDING_ADMIN: Symbol = symbol_short!("PEND_ADM");
-const RATE_CFG: Symbol = symbol_short!("RATECFG");
-const RATE_TRACK: Symbol = symbol_short!("RLTRK");
+/// Storage keys (all ≤9 chars for symbol_short!)
 
 
 /// Maximum number of public inputs accepted per proof verification.
@@ -286,7 +282,8 @@ impl ZkVerifierContract {
         };
 
         if caller != &admin {
-            return Self::unauthorized(env, caller, action, "current_admin");
+            unauthorized(&env, caller, action, "current_admin");
+            return Err(ContractError::Unauthorized);
         }
 
         Ok(())
