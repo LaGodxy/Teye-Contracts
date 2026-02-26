@@ -1084,7 +1084,9 @@ fn test_nullifier_basic_functionality() {
         proof_c,
         &[&pi],
     );
-
+    // Set timestamp for the request
+    request.timestamp = env.ledger().timestamp();
+    
     // Test that nullifier computation works
     let nullifier1 = ZkAccessHelper::compute_nullifier(
         &env,

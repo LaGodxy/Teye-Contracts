@@ -55,15 +55,15 @@ const MAX_PUBLIC_INPUTS: u32 = 16;
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct AccessRequest {
-    /// The address of the user requesting access.
+    /// The address of user requesting access.
     pub user: Address,
-    /// Unique identifier for the resource being accessed.
+    /// Unique identifier for resource being accessed.
     pub resource_id: BytesN<32>,
     /// The Groth16 proof (points A, B, and C).
     pub proof: Proof,
     /// Public inputs associated with the proof.
     pub public_inputs: Vec<BytesN<32>>,
-    /// Timestamp when the request was created.
+    /// Timestamp when request was created.
     pub timestamp: u64,
     /// Nonce to prevent replay attacks (in addition to nullifier).
     pub nonce: u64,
@@ -223,7 +223,7 @@ fn emit_access_violation(env: &Env, user: &Address, action: &str, reason: &str) 
 }
 
 /// Helper function to emit unauthorized access events and return error.
-fn unauthorized(env: &Env, user: &Address, action: &str, reason: &str) -> Result<bool, ContractError> {
+fn unauthorized(env: &Env, user: &Address, action: &str, reason: &str) -> Result<(), ContractError> {
     #[allow(deprecated)]
     env.events().publish(
         (symbol_short!("UNAUTHORIZED"), user.clone()),
@@ -279,7 +279,10 @@ impl ZkVerifierContract {
 
         let admin: Address = match env.storage().instance().get(&ADMIN) {
             Some(admin) => admin,
-            None => return Self::unauthorized(env, caller, action, "initialized_admin"),
+            None => {
+            unauthorized(&env, caller, action, "initialized_admin");
+            return Err(ContractError::Unauthorized);
+        }
         };
 
         if caller != &admin {
@@ -317,12 +320,16 @@ impl ZkVerifierContract {
             .ok_or(ContractError::InvalidConfig)?;
 
         if new_admin != pending {
-            return Self::unauthorized(&env, &new_admin, "accept_admin", "pending_admin");
+            unauthorized(&env, &new_admin, "accept_admin", "pending_admin");
+            return Err(ContractError::Unauthorized);
         }
 
         let old_admin: Address = match env.storage().instance().get(&ADMIN) {
             Some(admin) => admin,
-            None => return Self::unauthorized(&env, &new_admin, "accept_admin", "initialized_admin"),
+            None => {
+            unauthorized(&env, &new_admin, "accept_admin", "initialized_admin");
+            return Err(ContractError::Unauthorized);
+        }
         };
 
         env.storage().instance().set(&ADMIN, &new_admin);
@@ -380,60 +387,6 @@ impl ZkVerifierContract {
         }
 
         Ok(proof_ids)
-    }
-
-    /// Sets the ZK Verification Key for Groth16.
-    pub fn set_verification_key(
-        env: Env,
-        caller: Address,
-        vk: VerificationKey,
-    ) -> Result<(), ContractError> {
-        Self::require_admin(&env, &caller, "set_verification_key")?;
-        env.storage().instance().set(&symbol_short!("VK"), &vk);
-        Ok(())
-    }
-
-    /// Gets the configured Verification Key.
-    pub fn get_verification_key(env: Env) -> Option<VerificationKey> {
-        env.storage().instance().get(&symbol_short!("VK"))
-    }
-    /// Return the current rate limiting configuration, if any.
-    pub fn get_rate_limit_config(env: Env) -> Option<(u64, u64)> {
-        env.storage().instance().get(&RATE_CFG)
-    }
-
-    /// Enables or disables whitelist enforcement.
-    pub fn set_whitelist_enabled(
-        env: Env,
-        caller: Address,
-        enabled: bool,
-    ) -> Result<(), ContractError> {
-        Self::require_admin(&env, &caller, "set_whitelist_enabled")?;
-        whitelist::set_whitelist_enabled(&env, enabled);
-        Ok(())
-    }
-
-    /// Adds an address to the whitelist.
-    pub fn add_to_whitelist(env: Env, caller: Address, user: Address) -> Result<(), ContractError> {
-        Self::require_admin(&env, &caller, "add_to_whitelist")?;
-        whitelist::add_to_whitelist(&env, &user);
-        Ok(())
-    }
-
-    /// Removes an address from the whitelist.
-    pub fn remove_from_whitelist(
-        env: Env,
-        caller: Address,
-        user: Address,
-    ) -> Result<(), ContractError> {
-        Self::require_admin(&env, &caller, "remove_from_whitelist")?;
-        whitelist::remove_from_whitelist(&env, &user);
-        Ok(())
-    }
-
-    /// Check if contract is initialized
-    pub fn is_initialized(env: Env) -> bool {
-        env.storage().instance().has(&INITIALIZED)
     }
 
     // ── Credential schema management ─────────────────────────────────────────
@@ -604,7 +557,8 @@ impl ZkVerifierContract {
                 request.resource_id.clone(),
                 ContractError::Unauthorized,
             );
-            return unauthorized(&env, &request.user, "verify_access", "whitelisted_user");
+            unauthorized(&env, &request.user, "verify_access", "whitelisted_user");
+            return Err(ContractError::Unauthorized);
         }
 
         Self::check_and_update_rate_limit(&env, &request.user).map_err(|err| {

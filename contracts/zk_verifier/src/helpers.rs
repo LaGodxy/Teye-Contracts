@@ -94,6 +94,7 @@ impl ZkAccessHelper {
             },
             public_inputs: pi_vec,
             nonce: 0, // Default nonce; caller should set appropriately for replay protection
+            timestamp: env.ledger().timestamp(), // Set current timestamp
         }
     }
 }
