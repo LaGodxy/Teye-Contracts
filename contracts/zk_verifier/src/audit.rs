@@ -10,6 +10,8 @@ pub struct AuditRecord {
     pub resource_id: BytesN<32>,
     /// The hash of the public inputs used in the proof.
     pub proof_hash: BytesN<32>,
+    /// The nullifier to prevent proof replay attacks.
+    pub nullifier: BytesN<32>,
     /// The ledger timestamp of the verification event.
     pub timestamp: u64,
     /// Hash of the previous audit record in the chain (zero for the first record).
@@ -21,6 +23,7 @@ fn hash_record(env: &Env, record: &AuditRecord) -> BytesN<32> {
     let mut buf = Bytes::new(env);
     buf.extend_from_array(&record.proof_hash.to_array());
     buf.extend_from_array(&record.resource_id.to_array());
+    buf.extend_from_array(&record.nullifier.to_array());
     buf.extend_from_array(&record.prev_hash.to_array());
     buf.extend_from_array(&record.timestamp.to_be_bytes());
     env.crypto().keccak256(&buf).into()
@@ -32,7 +35,7 @@ pub struct AuditTrail;
 impl AuditTrail {
     /// Logs a successful access verification event to persistent storage and emits an event.
     /// Each new record is chained to the previous one via `prev_hash`.
-    pub fn log_access(env: &Env, user: Address, resource_id: BytesN<32>, proof_hash: BytesN<32>) {
+    pub fn log_access(env: &Env, user: Address, resource_id: BytesN<32>, proof_hash: BytesN<32>, nullifier: BytesN<32>) {
         let key = (&user, &resource_id);
         let mut chain: Vec<AuditRecord> = env
             .storage()
@@ -53,6 +56,7 @@ impl AuditTrail {
             user: user.clone(),
             resource_id: resource_id.clone(),
             proof_hash,
+            nullifier,
             timestamp: env.ledger().timestamp(),
             prev_hash,
         };

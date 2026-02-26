@@ -63,7 +63,10 @@ pub struct AccessRequest {
     pub proof: Proof,
     /// Public inputs associated with the proof.
     pub public_inputs: Vec<BytesN<32>>,
+    /// Timestamp when the request was created.
     pub timestamp: u64,
+    /// Nonce to prevent replay attacks (in addition to nullifier).
+    pub nonce: u64,
 }
 
 /// Storage keys (all ≤9 chars for symbol_short!)
@@ -71,6 +74,8 @@ const ADMIN: Symbol = symbol_short!("ADMIN");
 const INITIALIZED: Symbol = symbol_short!("INIT");
 const PROOF_CTR: Symbol = symbol_short!("PROOF_CTR");
 const VFY_RES: Symbol = symbol_short!("VFY_RES");
+const NULLIFIER: Symbol = symbol_short!("NULLIFIER");
+const VK: Symbol = symbol_short!("VK");
 
 /// Contract error codes
 #[soroban_sdk::contracterror]
@@ -101,6 +106,14 @@ pub enum ContractError {
     InvalidAuthLevel = 13,
     /// Public inputs are insufficient for the required authentication level.
     ProofRequiredForAuthLevel = 14,
+    /// Proof has already been used (replay attack detected).
+    ProofReplayed = 15,
+    /// Invalid input data provided.
+    InvalidInput = 16,
+    /// Contract has not been initialized.
+    NotInitialized = 17,
+    /// Contract has already been initialized.
+    AlreadyInitialized = 18,
 }
 
 /// Map low-level proof validation errors into contract-level errors.
@@ -187,6 +200,46 @@ fn validate_level4_attributes(request: &AccessRequest) -> Result<(), ContractErr
     Ok(())
 }
 
+/// Check if a nullifier has already been used (proof replay protection).
+fn check_nullifier(env: &Env, nullifier: &BytesN<32>) -> Result<(), ContractError> {
+    if env.storage().persistent().has(&(NULLIFIER, nullifier)) {
+        return Err(ContractError::ProofReplayed);
+    }
+    Ok(())
+}
+
+/// Store a nullifier to prevent future replay of the same proof.
+fn store_nullifier(env: &Env, nullifier: &BytesN<32>) {
+    env.storage().persistent().set(&(NULLIFIER, nullifier), &true);
+}
+
+/// Emit an access violation event for monitoring and security purposes.
+fn emit_access_violation(env: &Env, user: &Address, action: &str, reason: &str) {
+    #[allow(deprecated)]
+    env.events().publish(
+        (symbol_short!("VIOLATION"), user.clone()),
+        (action, reason),
+    );
+}
+
+/// Helper function to emit unauthorized access events and return error.
+fn unauthorized(env: &Env, user: &Address, action: &str, reason: &str) -> Result<bool, ContractError> {
+    #[allow(deprecated)]
+    env.events().publish(
+        (symbol_short!("UNAUTHORIZED"), user.clone()),
+        (action, reason),
+    );
+    Err(ContractError::Unauthorized)
+}
+
+/// Helper function to check if contract is initialized.
+fn require_initialized(env: &Env) -> Result<(), ContractError> {
+    if !env.storage().instance().has(&INITIALIZED) {
+        return Err(ContractError::NotInitialized);
+    }
+    Ok(())
+}
+
 #[contractimpl]
 impl ZkVerifierContract {
     /// Initialize the zk verifier contract
@@ -199,6 +252,9 @@ impl ZkVerifierContract {
         env.storage().instance().set(&INITIALIZED, &true);
         env.storage().instance().set(&PROOF_CTR, &0u64);
 
+        Ok(())
+    }
+
     /// Store the Groth16 verification key used by `verify_access`.
     ///
     /// Only the admin may call this.  The key can be updated at any time
@@ -208,7 +264,7 @@ impl ZkVerifierContract {
         caller: Address,
         vk: VerificationKey,
     ) -> Result<(), ContractError> {
-        Self::require_admin(&env, &caller)?;
+        Self::require_admin(&env, &caller, "set_verification_key")?;
         env.storage().instance().set(&VK, &vk);
         Ok(())
     }
@@ -218,7 +274,7 @@ impl ZkVerifierContract {
         env.storage().instance().get(&VK)
     }
 
-    fn require_admin(env: &Env, caller: &Address) -> Result<(), ContractError> {
+    fn require_admin(env: &Env, caller: &Address, action: &str) -> Result<(), ContractError> {
         caller.require_auth();
 
         let admin: Address = match env.storage().instance().get(&ADMIN) {
@@ -266,9 +322,7 @@ impl ZkVerifierContract {
 
         let old_admin: Address = match env.storage().instance().get(&ADMIN) {
             Some(admin) => admin,
-            None => {
-                return Self::unauthorized(&env, &new_admin, "accept_admin", "initialized_admin")
-            }
+            None => return Self::unauthorized(&env, &new_admin, "accept_admin", "initialized_admin"),
         };
 
         env.storage().instance().set(&ADMIN, &new_admin);
@@ -321,7 +375,7 @@ impl ZkVerifierContract {
             let proof = proofs.get(i).unwrap().clone();
             let public_inputs = public_inputs_batch.get(i).unwrap().clone();
 
-            let proof_id = Self::verify_proof(env.clone(), submitter.clone(), proof, public_inputs)?;
+            let proof_id = Self::prepare_verify_proof(env.clone(), submitter.clone(), proof, public_inputs)?;
             proof_ids.push_back(proof_id);
         }
 
@@ -382,7 +436,7 @@ impl ZkVerifierContract {
         env.storage().instance().has(&INITIALIZED)
     }
 
-    // ======================== Two-Phase Commit Hooks ========================
+    // ── Credential schema management ─────────────────────────────────────────
 
     /// Prepare phase for proof verification
     pub fn prepare_verify_proof(
@@ -391,7 +445,7 @@ impl ZkVerifierContract {
         proof: Proof,
         public_inputs: Vec<BytesN<32>>,
     ) -> Result<u64, ContractError> {
-        Self::require_initialized(&env)?;
+        require_initialized(&env)?;
 
         if public_inputs.is_empty() {
             return Err(ContractError::InvalidInput);
@@ -453,7 +507,7 @@ impl ZkVerifierContract {
         proofs: Vec<Proof>,
         public_inputs_batch: Vec<Vec<BytesN<32>>>,
     ) -> Result<Vec<u64>, ContractError> {
-        Self::require_initialized(&env)?;
+        require_initialized(&env)?;
 
         if proofs.len() != public_inputs_batch.len() {
             return Err(ContractError::InvalidInput);
@@ -514,8 +568,9 @@ impl ZkVerifierContract {
     /// 1. Authorizes the user.
     /// 2. Validates the request shape.
     /// 3. Checks whitelist and rate limits.
-    /// 4. Verifies the Groth16 proof via `Bn254Verifier`.
-    /// 5. Logs the access in the `AuditTrail` if successful.
+    /// 4. Computes and checks nullifier to prevent replay attacks.
+    /// 5. Verifies the Groth16 proof via `Bn254Verifier`.
+    /// 6. Logs the access in the `AuditTrail` if successful.
     ///
     /// Returns `true` if the proof is valid and all checks pass, otherwise returns an error or `false`.
     pub fn verify_access(env: Env, request: AccessRequest) -> Result<bool, ContractError> {
@@ -549,7 +604,7 @@ impl ZkVerifierContract {
                 request.resource_id.clone(),
                 ContractError::Unauthorized,
             );
-            return Self::unauthorized(&env, &request.user, "verify_access", "whitelisted_user");
+            return unauthorized(&env, &request.user, "verify_access", "whitelisted_user");
         }
 
         Self::check_and_update_rate_limit(&env, &request.user).map_err(|err| {
@@ -565,24 +620,46 @@ impl ZkVerifierContract {
         Bn254Verifier::validate_proof_components(&request.proof, &request.public_inputs)
             .map_err(map_proof_validation_error)?;
 
+        // Compute nullifier and check for replay attacks
+        let nullifier = ZkAccessHelper::compute_nullifier(
+            &env,
+            &request.proof,
+            &request.public_inputs,
+            &request.user,
+            &request.resource_id,
+        );
+
+        check_nullifier(&env, &nullifier).map_err(|err| {
+            events::publish_access_rejected(
+                &env,
+                request.user.clone(),
+                request.resource_id.clone(),
+                err,
+            );
+            err
+        })?;
+
         // TODO: post-quantum migration - The verification branch below is hardcoded for BN254 Groth16.
         // During migration, checking `request.proof_type` should branch to `PostQuantumVerifier::verify_proof`
         // or a native host-function call if STARK verification limits CPU budgets.
-        let vk = Self::get_verification_key(env.clone()).ok_or(ContractError::InvalidConfig)?;
         let is_valid =
-            Bn254Verifier::verify_proof(&env, &vk, &request.proof, &request.public_inputs);
+            Bn254Verifier::verify_proof(&env, &request.proof, &request.public_inputs);
+        
         if is_valid {
+            // Store nullifier to prevent replay
+            store_nullifier(&env, &nullifier);
+            
             let proof_hash = PoseidonHasher::hash(&env, &request.public_inputs);
-            AuditTrail::log_access(&env, request.user, request.resource_id, proof_hash);
+            AuditTrail::log_access(&env, request.user, request.resource_id, proof_hash, nullifier);
         } else {
-            Self::emit_access_violation(
+            emit_access_violation(
                 &env,
                 &request.user,
                 "verify_access",
                 "valid_groth16_proof",
             );
         }
-        Ok(())
+        Ok(is_valid)
     }
 
     /// Verifies access with auth-level-aware ZK requirements.
@@ -625,6 +702,8 @@ impl ZkVerifierContract {
         executor.require_auth();
         // Additional checks for authorized executors can be added here
         Self::verify_access(env, request)
+    }
+
     /// Verifies the integrity of the audit chain for a given user and resource.
     ///
     /// Returns `true` if all hash links are valid, or if the chain is empty.
